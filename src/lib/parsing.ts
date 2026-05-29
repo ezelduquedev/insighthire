@@ -6,7 +6,7 @@ import { groqClient, MODEL } from "./openai"
 export async function extractTextFromBuffer(buffer: Buffer, fileType: string): Promise<string> {
   if (fileType === "application/pdf") {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pdf = require("pdf-parse")
+    const pdf = require("pdf-parse/lib/pdf-parse.js")
     const data = await pdf(buffer)
     return data.text || ""
   } else {
