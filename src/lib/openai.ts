@@ -7,9 +7,11 @@ if (process.env.NODE_ENV === 'development') {
 // Detectamos si estamos usando Groq
 const isGroq = !!process.env.GROQ_API_KEY;
 
+const apiKey = (isGroq ? process.env.GROQ_API_KEY : process.env.OPENAI_API_KEY) || 'dummy-api-key-for-build';
+
 // Configuramos el cliente único basado en la disponibilidad de la API Key
 export const client = new OpenAI({
-  apiKey: isGroq ? process.env.GROQ_API_KEY : process.env.OPENAI_API_KEY,
+  apiKey,
   baseURL: isGroq ? 'https://api.groq.com/openai/v1' : 'https://api.openai.com/v1',
 });
 
