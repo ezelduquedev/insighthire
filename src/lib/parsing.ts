@@ -5,55 +5,10 @@ import { groqClient, MODEL } from "./openai"
 // Esta es la función principal. Recibe el contenido del archivo ya en memoria.
 export async function extractTextFromBuffer(buffer: Buffer, fileType: string): Promise<string> {
   if (fileType === "application/pdf") {
-    const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs")
-    const workerPath = new URL(
-      "pdfjs-dist/legacy/build/pdf.worker.mjs",
-      import.meta.url
-    )
-    pdfjsLib.GlobalWorkerOptions.workerSrc = workerPath.href
-
-    const loadingTask = pdfjsLib.getDocument({
-      data: new Uint8Array(buffer),
-      useWorkerFetch: false,
-      useSystemFonts: true,
-    })
-    const pdf = await loadingTask.promise
-    const pages: string[] = []
-
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i)
-      const content = await page.getTextContent()
-
-      const itemsWithY = content.items
-        .filter((item: any) => "str" in item && item.str.trim())
-        .map((item: any) => ({
-          str: item.str as string,
-          y: Math.round((item.transform as number[])[5]),
-          x: (item.transform as number[])[4],
-        }))
-
-      if (itemsWithY.length === 0) continue
-
-      itemsWithY.sort((a: any, b: any) => b.y - a.y || a.x - b.x)
-
-      const lines: string[] = []
-      let currentY = itemsWithY[0].y
-      let currentLine: string[] = []
-
-      for (const item of itemsWithY) {
-        if (Math.abs(item.y - currentY) > 3) {
-          if (currentLine.length > 0) lines.push(currentLine.join(" ").trim())
-          currentLine = [item.str]
-          currentY = item.y
-        } else {
-          currentLine.push(item.str)
-        }
-      }
-      if (currentLine.length > 0) lines.push(currentLine.join(" ").trim())
-      pages.push(lines.join("\n"))
-    }
-
-    return pages.join("\n")
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const pdf = require("pdf-parse")
+    const data = await pdf(buffer)
+    return data.text || ""
   } else {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const mammoth = require("mammoth")
