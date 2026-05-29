@@ -437,6 +437,7 @@ Para SENIORITY:
 - "JUNIOR": menos de 2 años de experiencia relevante en desarrollo/tecnología.
 - "MID": entre 2 y 5 años de experiencia relevante en desarrollo/tecnología.
 - "SENIOR": más de 5 años de experiencia relevante en desarrollo/tecnología o rol de liderazgo técnico.
+- CRÍTICO PARA CAMBIO DE CARRERA (CAREER SWITCHERS): Si el candidato tiene muchos años de experiencia en otra profesión (ej. 5 años como Técnico de Sonido, Cocinero, etc.) pero está empezando en tecnología o se acaba de graduar en DAM/DAW/Ingeniería, su seniority DEBE ser "JUNIOR". No sumes los años de su profesión anterior para la seniority de IT.
 
 Texto del CV:
 """
@@ -493,21 +494,49 @@ Responde ÚNICAMENTE con este JSON (sin markdown, sin texto extra):
     if (!content) throw new Error("La IA no devolvió contenido")
     const parsed = JSON.parse(content) as ParsedResume
 
+    const currentYear = new Date().getFullYear()
+    const techKeywords = [
+      "desarrollador", "developer", "programador", "software", "frontend",
+      "backend", "fullstack", "full-stack", "dam", "daw", "it", "web", "pwa",
+      "sistemas", "código", "engineer", "ingeniero de software", "programación"
+    ]
+
+    // Mapear experiencias
+    const mappedExperiences = (Array.isArray(parsed.experiences) ? parsed.experiences : []).map(exp => ({
+      company: exp.company || "Empresa no especificada",
+      position: exp.position || "Puesto no especificado",
+      startDate: exp.startDate || `${currentYear}-01-01`,
+      endDate: exp.endDate || null,
+      description: exp.description || "",
+      technologies: Array.isArray(exp.technologies) ? exp.technologies : [],
+    }))
+
+    // Calcular años reales en tecnología
+    let techYears = 0
+    mappedExperiences.forEach(exp => {
+      const position = exp.position.toLowerCase()
+      const isTech = techKeywords.some(keyword => position.includes(keyword))
+      if (isTech) {
+        const start = parseInt(exp.startDate.split("-")[0]) || currentYear
+        const end = exp.endDate ? (parseInt(exp.endDate.split("-")[0]) || currentYear) : currentYear
+        techYears += Math.max(1, (end - start)) // asumimos al menos 1 año por rol tech si empezó
+      }
+    })
+
+    // Forzar JUNIOR si tiene menos de 2 años de experiencia tecnológica real
+    let seniority = ["JUNIOR", "MID", "SENIOR", "LEAD"].includes(parsed.seniority) ? parsed.seniority : "JUNIOR"
+    if (techYears < 2) {
+      seniority = "JUNIOR"
+    }
+
     return {
       name: parsed.name || "",
       email: parsed.email || "",
       phone: parsed.phone || "",
       linkedin: parsed.linkedin || "",
       skills: Array.isArray(parsed.skills) ? parsed.skills : [],
-      seniority: ["JUNIOR", "MID", "SENIOR", "LEAD"].includes(parsed.seniority) ? parsed.seniority : "JUNIOR",
-      experiences: (Array.isArray(parsed.experiences) ? parsed.experiences : []).map(exp => ({
-        company: exp.company || "Empresa no especificada",
-        position: exp.position || "Puesto no especificado",
-        startDate: exp.startDate || "2020-01-01",
-        endDate: exp.endDate || null,
-        description: exp.description || "",
-        technologies: Array.isArray(exp.technologies) ? exp.technologies : [],
-      })),
+      seniority,
+      experiences: mappedExperiences,
       educations: (Array.isArray(parsed.educations) ? parsed.educations : []).map(edu => ({
         institution: edu.institution || "Institución no especificada",
         degree: edu.degree || "Título no especificado",

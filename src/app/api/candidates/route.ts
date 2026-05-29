@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
         resume: {
           create: {
             fileName,
-            fileUrl,
+            fileUrl: fileUrl || "in-memory",
             fileType,
             rawText,
             parsedData: parsed as any,
