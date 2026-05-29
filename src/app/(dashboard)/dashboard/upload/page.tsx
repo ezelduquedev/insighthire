@@ -24,7 +24,13 @@ export default function UploadPage() {
     const candidateRes = await fetch("/api/candidates", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fileUrl: uploadData.fileUrl, fileName: uploadData.fileName, fileType: uploadData.fileType, fileSize: uploadData.fileSize }),
+      body: JSON.stringify({
+        fileName: uploadData.fileName,
+        fileType: uploadData.fileType,
+        fileSize: uploadData.fileSize,
+        rawText: uploadData.rawText,   // ← texto ya extraído en el upload
+        fileUrl: uploadData.fileUrl ?? null,
+      }),
     })
     if (!candidateRes.ok) throw new Error("Error al procesar el candidato")
     const candidateData = await candidateRes.json()

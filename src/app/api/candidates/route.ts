@@ -61,13 +61,15 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { fileUrl, fileName, fileType } = body
+    const { fileUrl, fileName, fileType, rawText: rawTextFromBody } = body
 
-    if (!fileUrl) {
+    if (!fileName || !fileType) {
       return NextResponse.json({ error: "Faltan datos requeridos" }, { status: 400 })
     }
 
-    const rawText = await extractText(fileUrl, fileType)
+    // Si el upload ya extrajo el texto (Vercel), lo usamos directamente
+    // Si no, lo extraemos ahora (desarrollo local con fileUrl en disco)
+    const rawText = rawTextFromBody ?? (fileUrl ? await extractText(fileUrl, fileType) : "")
     const parsed = await parseResumeWithAI(rawText)
 
     const candidate = await prisma.candidate.create({

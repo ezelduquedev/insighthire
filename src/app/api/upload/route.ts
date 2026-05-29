@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
-import { writeFile, mkdir } from "fs/promises"
+import { writeFile, mkdir, unlink } from "fs/promises"
 import { join } from "path"
 import { v4 as uuidv4 } from "uuid"
+import { extractText } from "@/lib/parsing"
 
 const MAX_SIZE = 5 * 1024 * 1024 // 5MB
 const ALLOWED_TYPES = [
@@ -9,11 +10,9 @@ const ALLOWED_TYPES = [
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ]
 
-// En Vercel las funciones serverless solo pueden escribir en /tmp
-// En desarrollo usamos public/uploads para poder servir los ficheros estáticamente
-const IS_VERCEL = process.env.VERCEL === "1"
-
 export async function POST(req: NextRequest) {
+  let tmpPath: string | null = null
+
   try {
     const formData = await req.formData()
     const file = formData.get("file") as File | null
@@ -32,36 +31,34 @@ export async function POST(req: NextRequest) {
 
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
-
     const ext = file.type === "application/pdf" ? ".pdf" : ".docx"
     const fileName = `${uuidv4()}${ext}`
 
-    let fileUrl: string
+    // Siempre guardamos en /tmp (funciona en Vercel y en local)
+    // El archivo solo necesita existir durante esta misma función para extraer el texto
+    const tmpDir = "/tmp/uploads"
+    await mkdir(tmpDir, { recursive: true })
+    tmpPath = join(tmpDir, fileName)
+    await writeFile(tmpPath, buffer)
 
-    if (IS_VERCEL) {
-      // En Vercel: guardar en /tmp (único directorio escribible)
-      const tmpDir = "/tmp/uploads"
-      await mkdir(tmpDir, { recursive: true })
-      const filePath = join(tmpDir, fileName)
-      await writeFile(filePath, buffer)
-      fileUrl = `/tmp/uploads/${fileName}`
-    } else {
-      // En desarrollo: guardar en public/uploads para acceso estático
-      const uploadDir = join(process.cwd(), "public", "uploads")
-      await mkdir(uploadDir, { recursive: true })
-      const filePath = join(uploadDir, fileName)
-      await writeFile(filePath, buffer)
-      fileUrl = `/uploads/${fileName}`
-    }
+    // Extraemos el texto del CV dentro de esta misma invocación
+    // (antes de que /tmp desaparezca en otra Lambda)
+    const rawText = await extractText(tmpPath, file.type)
+
+    // Limpieza del archivo temporal
+    try { await unlink(tmpPath) } catch { /* ignorar */ }
+    tmpPath = null
 
     return NextResponse.json({
       success: true,
       fileName: file.name,
-      fileUrl,
       fileType: file.type,
       fileSize: file.size,
+      rawText, // ← texto ya extraído, listo para parsear
     })
   } catch (error) {
+    // Intentar limpiar el archivo temporal si hubo error
+    if (tmpPath) { try { await unlink(tmpPath) } catch { /* ignorar */ } }
     console.error("Error en upload:", error)
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
   }
