@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { useSearchParams } from "next/navigation"
 import { motion } from "framer-motion"
-import { Search, Star, Filter, Download, FileText, Trash2, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
+import { Search, Star, Filter, Download, Trash2, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
 import Link from "next/link"
 
 type Skill = { id: string; name: string; category: string }
@@ -64,7 +64,6 @@ export default function CandidatesPage() {
   const [statusFilter, setStatusFilter] = useState("")
   const [loading, setLoading] = useState(true)
   const [exportingCSV, setExportingCSV] = useState(false)
-  const [exportingPDF, setExportingPDF] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
@@ -103,15 +102,6 @@ export default function CandidatesPage() {
       const data = await res.json()
       exportToCSV(data.candidates ?? [], "candidatos_insighthire.csv")
     } finally { setExportingCSV(false) }
-  }
-
-  const handleExportPDF = async (c: Candidate) => {
-    setExportingPDF(c.id)
-    try {
-      const res = await fetch(`/api/candidates/${c.id}`)
-      const data = await res.json()
-      await exportToPDF(data.candidate ?? c)
-    } finally { setExportingPDF(null) }
   }
 
   const handleDelete = async (id: string) => {
@@ -256,18 +246,6 @@ export default function CandidatesPage() {
                     <td style={{ textAlign: "right" }}>
                       <div className="flex items-center gap-1.5 justify-end">
                         <button
-                          onClick={() => handleExportPDF(c)}
-                          disabled={exportingPDF === c.id}
-                          title="Exportar PDF"
-                          className="p-1.5 rounded-lg transition-colors disabled:opacity-40 cursor-pointer"
-                          style={{ color: "var(--ih-text-muted)" }}
-                        >
-                          {exportingPDF === c.id
-                            ? <Loader2 className="h-4 w-4 animate-spin" />
-                            : <FileText className="h-4 w-4" />
-                          }
-                        </button>
-                        <button
                           onClick={() => handleDelete(c.id)}
                           disabled={deletingId === c.id}
                           title={confirmDeleteId === c.id ? "Clic de nuevo para confirmar" : "Eliminar"}
@@ -340,14 +318,4 @@ function exportToCSV(candidates: Candidate[], filename: string) {
   const csv = [header,...rows].map(r=>r.map(esc).join(',')).join('\r\n')
   const a = Object.assign(document.createElement('a'),{href:URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})),download:filename})
   document.body.appendChild(a); a.click(); document.body.removeChild(a)
-}
-
-async function exportToPDF(candidate: Candidate) {
-  try {
-    const res = await fetch('/api/export/pdf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(candidate)})
-    if (!res.ok) throw new Error()
-    const url = URL.createObjectURL(await res.blob())
-    const a = Object.assign(document.createElement('a'),{href:url,download:`${candidate.name}.pdf`})
-    document.body.appendChild(a); a.click(); document.body.removeChild(a)
-  } catch(e){ console.error('PDF error',e) }
 }
