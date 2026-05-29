@@ -9,6 +9,10 @@ const ALLOWED_TYPES = [
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ]
 
+// En Vercel las funciones serverless solo pueden escribir en /tmp
+// En desarrollo usamos public/uploads para poder servir los ficheros estáticamente
+const IS_VERCEL = process.env.VERCEL === "1"
+
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData()
@@ -29,16 +33,26 @@ export async function POST(req: NextRequest) {
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
 
-    const uploadDir = join(process.cwd(), "public", "uploads")
-    await mkdir(uploadDir, { recursive: true })
-
     const ext = file.type === "application/pdf" ? ".pdf" : ".docx"
     const fileName = `${uuidv4()}${ext}`
-    const filePath = join(uploadDir, fileName)
 
-    await writeFile(filePath, buffer)
+    let fileUrl: string
 
-    const fileUrl = `/uploads/${fileName}`
+    if (IS_VERCEL) {
+      // En Vercel: guardar en /tmp (único directorio escribible)
+      const tmpDir = "/tmp/uploads"
+      await mkdir(tmpDir, { recursive: true })
+      const filePath = join(tmpDir, fileName)
+      await writeFile(filePath, buffer)
+      fileUrl = `/tmp/uploads/${fileName}`
+    } else {
+      // En desarrollo: guardar en public/uploads para acceso estático
+      const uploadDir = join(process.cwd(), "public", "uploads")
+      await mkdir(uploadDir, { recursive: true })
+      const filePath = join(uploadDir, fileName)
+      await writeFile(filePath, buffer)
+      fileUrl = `/uploads/${fileName}`
+    }
 
     return NextResponse.json({
       success: true,

@@ -4,7 +4,12 @@ import { readFile } from "fs/promises"
 import { groqClient, MODEL } from "./openai"
 
 export async function extractText(fileUrl: string, fileType: string): Promise<string> {
-  const filePath = join(process.cwd(), "public", fileUrl)
+  // Si el fileUrl empieza por /tmp (Vercel), lo usamos directamente como ruta absoluta
+  // Si empieza por /uploads (desarrollo), lo resolvemos relativo a public/
+  const filePath = fileUrl.startsWith("/tmp")
+    ? fileUrl
+    : join(process.cwd(), "public", fileUrl)
+
   const buffer = await readFile(filePath)
 
   if (fileType === "application/pdf") {
