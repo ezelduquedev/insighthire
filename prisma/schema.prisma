@@ -1,0 +1,237 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  image     String?
+  role      UserRole @default(RECRUITER)
+  password  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  candidates Candidate[]
+  jobOffers  JobOffer[]
+
+  @@map("User")
+}
+
+model Candidate {
+  id              String        @id @default(uuid())
+  name            String?
+  email           String?
+  phone           String?
+  location        String?
+  linkedin        String?
+  seniority       Seniority?
+  status          CandidateStatus @default(NEW)
+  favorite        Boolean       @default(false)
+  
+  summary         String?
+  strengths       String[]      @default([])
+  weaknesses      String[]      @default([])
+  technicalScore  Int?
+  generalScore    Int?
+  justification   String?
+  
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  resume          Resume?
+  experiences     Experience[]
+  education       Education[]
+  skills          Skill[]
+  matches         CandidateMatch[]
+  chatMessages    ChatMessage[]
+  embeddings      Embedding[]
+  notes           Note[]
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@map("Candidate")
+}
+
+model Resume {
+  id        String   @id @default(uuid())
+  fileName  String
+  fileUrl   String
+  fileType  String
+  fileSize  Int?
+  rawText   String?
+  parsedData Json?
+  
+  candidateId String    @unique
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+
+  @@map("Resume")
+}
+
+model Experience {
+  id           String   @id @default(uuid())
+  company      String
+  position     String
+  startDate    String
+  endDate      String?
+  description  String?
+  technologies String[] @default([])
+  
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+
+  @@map("Experience")
+}
+
+model Education {
+  id          String  @id @default(uuid())
+  institution String
+  degree      String
+  field       String
+  startDate   String
+  endDate     String?
+  
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+
+  @@map("Education")
+}
+
+model Skill {
+  id       String @id @default(uuid())
+  name     String
+  category String @default("TECHNICAL")
+  level    Int    @default(1)
+  
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+
+  @@map("Skill")
+}
+
+model JobOffer {
+  id           String   @id @default(uuid())
+  title        String
+  company      String
+  description  String
+  requirements String?
+  seniority    Seniority?
+  location     String?
+  isRemote     Boolean  @default(false)
+  skills       String[] @default([])
+  isActive     Boolean  @default(true)
+  
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  matches CandidateMatch[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("JobOffer")
+}
+
+model CandidateMatch {
+  id              String @id @default(uuid())
+  score           Float
+  skillMatch      Float?
+  experienceMatch Float?
+  seniorityMatch  Float?
+  explanation     String?
+  
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  
+  jobOfferId String
+  jobOffer   JobOffer @relation(fields: [jobOfferId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  
+  @@unique([candidateId, jobOfferId])
+  @@map("CandidateMatch")
+}
+
+model ChatMessage {
+  id        String      @id @default(uuid())
+  role      MessageRole
+  content   String
+  
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+
+  @@map("ChatMessage")
+}
+
+model Embedding {
+  id        String   @id @default(uuid())
+  content   String
+  embedding Unsupported("vector(1536)")
+  chunkType String   @default("GENERAL")
+  metadata  Json?    @default("{}")
+  
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+
+  @@map("Embedding")
+}
+
+model Note {
+  id      String @id @default(uuid())
+  content String
+  
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("Note")
+}
+
+enum UserRole {
+  ADMIN
+  RECRUITER
+}
+
+enum Seniority {
+  JUNIOR
+  MID
+  SENIOR
+  LEAD
+}
+
+enum CandidateStatus {
+  NEW
+  IN_REVIEW
+  TECHNICAL_INTERVIEW
+  CULTURAL_INTERVIEW
+  OFFER_SENT
+  HIRED
+  REJECTED
+  ARCHIVED
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+}
