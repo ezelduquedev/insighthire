@@ -146,7 +146,7 @@ export function DashboardSidebar({ user }: { user: any }) {
                 {user?.name || user?.email}
               </p>
               <p className="text-xs truncate" style={{ color: "var(--ih-text-muted)" }}>
-                {user?.role?.charAt(0) + (user?.role?.slice(1)?.toLowerCase() ?? "") || "Reclutador"}
+                {user?.role ? (user.role.charAt(0).toUpperCase() + user.role.slice(1).toLowerCase()) : "Reclutador"}
               </p>
             </div>
           </div>
