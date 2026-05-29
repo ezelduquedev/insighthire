@@ -1,17 +1,9 @@
-// src/lib/parsing.ts — REEMPLAZA completo
-import { join } from "path"
-import { readFile } from "fs/promises"
+// src/lib/parsing.ts
 import { groqClient, MODEL } from "./openai"
 
-export async function extractText(fileUrl: string, fileType: string): Promise<string> {
-  // Si el fileUrl empieza por /tmp (Vercel), lo usamos directamente como ruta absoluta
-  // Si empieza por /uploads (desarrollo), lo resolvemos relativo a public/
-  const filePath = fileUrl.startsWith("/tmp")
-    ? fileUrl
-    : join(process.cwd(), "public", fileUrl)
-
-  const buffer = await readFile(filePath)
-
+// ─── Extracción de texto desde Buffer (sin disco) ────────────────────────────
+// Esta es la función principal. Recibe el contenido del archivo ya en memoria.
+export async function extractTextFromBuffer(buffer: Buffer, fileType: string): Promise<string> {
   if (fileType === "application/pdf") {
     const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs")
     const workerPath = new URL(
@@ -32,31 +24,25 @@ export async function extractText(fileUrl: string, fileType: string): Promise<st
       const page = await pdf.getPage(i)
       const content = await page.getTextContent()
 
-      // Reconstruye líneas respetando posición vertical (Y)
-      // Agrupa items por línea basándose en su coordenada Y
       const itemsWithY = content.items
         .filter((item: any) => "str" in item && item.str.trim())
         .map((item: any) => ({
           str: item.str as string,
-          y: Math.round((item.transform as number[])[5]), // coordenada Y redondeada
+          y: Math.round((item.transform as number[])[5]),
           x: (item.transform as number[])[4],
         }))
 
       if (itemsWithY.length === 0) continue
 
-      // Ordena por Y descendente (PDF tiene Y desde abajo), luego por X
       itemsWithY.sort((a: any, b: any) => b.y - a.y || a.x - b.x)
 
-      // Agrupa en líneas: mismo Y (±3px) = misma línea
       const lines: string[] = []
       let currentY = itemsWithY[0].y
       let currentLine: string[] = []
 
       for (const item of itemsWithY) {
         if (Math.abs(item.y - currentY) > 3) {
-          if (currentLine.length > 0) {
-            lines.push(currentLine.join(" ").trim())
-          }
+          if (currentLine.length > 0) lines.push(currentLine.join(" ").trim())
           currentLine = [item.str]
           currentY = item.y
         } else {
@@ -64,7 +50,6 @@ export async function extractText(fileUrl: string, fileType: string): Promise<st
         }
       }
       if (currentLine.length > 0) lines.push(currentLine.join(" ").trim())
-
       pages.push(lines.join("\n"))
     }
 
@@ -75,6 +60,15 @@ export async function extractText(fileUrl: string, fileType: string): Promise<st
     const result = await mammoth.extractRawText({ buffer })
     return result.value
   }
+}
+
+// Alias para compatibilidad (no se usa en Vercel, solo en análisis posterior si hubiera fileUrl)
+export async function extractText(fileUrl: string, fileType: string): Promise<string> {
+  const { readFile } = await import("fs/promises")
+  const { join } = await import("path")
+  const filePath = fileUrl.startsWith("/tmp") ? fileUrl : join(process.cwd(), "public", fileUrl)
+  const buffer = await readFile(filePath)
+  return extractTextFromBuffer(buffer, fileType)
 }
 
 // ─── Tipos de retorno ────────────────────────────────────────────────────────
